@@ -285,7 +285,8 @@ server 10.8.0.0 255.255.255.0" > /etc/openvpn/server/server.conf
 		echo 'server-ipv6 fddd:1194:1194:1194::/64' >> /etc/openvpn/server/server.conf
 		echo 'push "redirect-gateway def1 ipv6 bypass-dhcp"' >> /etc/openvpn/server/server.conf
 	fi
-	echo 'ifconfig-pool-persist ipp.txt' >> /etc/openvpn/server/server.conf
+	echo "management localhost 7505
+ifconfig-pool-persist ipp.txt" >> /etc/openvpn/server/server.conf
 	# DNS
 	case "$dns" in
 		1|"")
