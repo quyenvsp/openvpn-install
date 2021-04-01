@@ -100,7 +100,7 @@ new_client () {
 	if grep -Fxq "auth-user-pass" /etc/openvpn/server/client-common.txt
 	then
 		echo "You will be asked for the client unix user password below"
-		useradd -g "openvpn-group" -s /bin/false "$client"
+		useradd -g "openvpn-group" -d /nonexistent -s /bin/false "$client"
 		passwd "$client"
 	fi
 }
