@@ -97,6 +97,12 @@ new_client () {
 	sed -ne '/BEGIN OpenVPN Static key/,$ p' /etc/openvpn/server/tc.key
 	echo "</tls-crypt>"
 	} > ~/"$client".ovpn
+	if grep -Fxq "auth-user-pass" /etc/openvpn/server/client-common.txt
+	then
+		echo "You will be asked for the client unix user password below"
+		useradd -g "openvpn-group" -s /bin/false "$client"
+		passwd "$client"
+	fi
 }
 
 if [[ ! -e /etc/openvpn/server/server.conf ]]; then
@@ -174,6 +180,15 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 		protocol=tcp
 		;;
 	esac
+	echo
+	echo "Which authentication method should OpenVPN use?"
+	echo "   1) Certificate"
+	echo "   2) Certificate + Username/Password"
+	read -p "Authentication [1]: " authentication
+	until [[ -z "$authentication" || "$authentication" =~ ^[12]$ ]]; do
+		echo "$authentication: invalid selection."
+		read -p "Authentication [1]: " authentication
+	done
 	echo
 	echo "What port should OpenVPN listen to?"
 	read -p "Port [1194]: " port
@@ -333,6 +348,16 @@ crl-verify crl.pem" >> /etc/openvpn/server/server.conf
 	if [[ "$protocol" = "udp" ]]; then
 		echo "explicit-exit-notify" >> /etc/openvpn/server/server.conf
 	fi
+	# Authentication
+	case "$authentication" in
+		2)
+			echo 'verify-client-cert require' >> /etc/openvpn/server/server.conf
+			echo 'plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so "openvpn login COMMONNAME password PASSWORD"' >> /etc/openvpn/server/server.conf
+			echo "auth    required        pam_unix.so    shadow    nodelay
+account required        pam_unix.so" >> /etc/pam.d/openvpn
+			groupadd "openvpn-group"
+		;;
+	esac
 	# Enable net.ipv4.ip_forward for the system
 	echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-openvpn-forward.conf
 	# Enable without waiting for a reboot or service restart
@@ -419,6 +444,12 @@ remote-cert-tls server
 auth SHA512
 ignore-unknown-option block-outside-dns
 verb 3" > /etc/openvpn/server/client-common.txt
+	# Authentication
+	case "$authentication" in
+		2)
+			echo "auth-user-pass" >> /etc/openvpn/server/client-common.txt
+		;;
+	esac
 	# Enable and start the OpenVPN service
 	systemctl enable --now openvpn-server@server.service
 	# Generates the custom client.ovpn
