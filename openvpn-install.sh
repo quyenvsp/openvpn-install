@@ -217,6 +217,16 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 	client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
 	[[ -z "$client" ]] && client="client"
 	echo
+	echo "Do you want to protect client file with a password?"
+	echo "(e.g. encrypt the private key with a password)"
+	echo "   1) Add a passwordless client"
+	echo "   2) Use a password for the client"
+	read -p "Authentication method [1]: " keypass
+	until [[ -z "$keypass" || "$keypass" =~ ^[1-2]$ ]]; do
+		echo "$keypass: invalid selection."
+		read -p "Authentication method [1]: " keypass
+	done
+	echo
 	echo "OpenVPN installation is ready to begin."
 	# Install a firewall if firewalld or iptables are not already available
 	if ! systemctl is-active --quiet firewalld.service && ! hash iptables 2>/dev/null; then
@@ -261,7 +271,15 @@ LimitNPROC=infinity" > /etc/systemd/system/openvpn-server@server.service.d/disab
 	./easyrsa --batch init-pki
 	./easyrsa --batch build-ca nopass
 	./easyrsa --batch --days=3650 build-server-full server nopass
-	./easyrsa --batch --days=3650 build-client-full "$client" nopass
+	case $keypass in
+		1)
+		./easyrsa --batch --days=3650 build-client-full "$client" nopass
+		;;
+		2)
+		echo "You will be asked for the client password below"
+		./easyrsa --batch --days=3650 build-client-full "$client"
+		;;
+	esac
 	./easyrsa --batch --days=3650 gen-crl
 	# Move the stuff we need
 	cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem /etc/openvpn/server
@@ -478,6 +496,16 @@ else
 	case "$option" in
 		1)
 			echo
+			echo "Do you want to protect client file with a password?"
+			echo "(e.g. encrypt the private key with a password)"
+			echo "   1) Add a passwordless client"
+			echo "   2) Use a password for the client"
+			read -p "Authentication method [1]: " keypass
+			until [[ -z "$keypass" || "$keypass" =~ ^[1-2]$ ]]; do
+				echo "$keypass: invalid selection."
+				read -p "Authentication method [1]: " keypass
+			done
+			echo
 			echo "Provide a name for the client:"
 			read -p "Name: " unsanitized_client
 			client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
@@ -487,7 +515,15 @@ else
 				client=$(sed 's/[^0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]/_/g' <<< "$unsanitized_client")
 			done
 			cd /etc/openvpn/server/easy-rsa/
-			./easyrsa --batch --days=3650 build-client-full "$client" nopass
+			case $keypass in
+				1)
+				./easyrsa --batch --days=3650 build-client-full "$client" nopass
+				;;
+				2)
+				echo "You will be asked for the client password below"
+				./easyrsa --batch --days=3650 build-client-full "$client"
+				;;
+			esac
 			# Generates the custom client.ovpn
 			new_client
 			echo
